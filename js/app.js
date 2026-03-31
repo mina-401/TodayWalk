@@ -51,12 +51,14 @@ $(document).ready(function () {
         });
 
         // 말풍선 인포윈도우
-        const infoWindow = new kakao.maps.InfoWindow({
-          content: `<div style="padding:6px 10px;font-size:12px;font-weight:700;white-space:nowrap;">📍 ${placeName}</div>`
-        });
-        infoWindow.open(map, waypointMarker);
+        const overlay = new kakao.maps.CustomOverlay({
+            content: `<div style="padding:6px 10px;font-size:12px;font-weight:700;white-space:nowrap;background:white;border-radius:4px;border:1px solid #ccc;font-family:sans-serif;color:#111;">📍 ${placeName}</div>`,
+            position: pos,
+            yAnchor: 2.5
+          });
+        overlay.setMap(map);
 
-        waypoints.push({ marker: waypointMarker, infoWindow, name: placeName });
+        waypoints.push({ marker: waypointMarker, overlay, name: placeName });
         showStatus(`경유지 ${waypoints.length}: ${placeName}`);
       });
     });
