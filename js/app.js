@@ -12,7 +12,7 @@ $(document).ready(function () {
   script.onload = function() {
     console.log("카카오 SDK 로드 완료");
     if (kakao && kakao.maps) {
-      kakao.maps.load(function() {
+        kakao.maps.load(function() {
         console.log("kakao.maps.load 호출됨");
         initMap();
       });
@@ -20,6 +20,28 @@ $(document).ready(function () {
       console.log(" kakao 객체 없음");
     }
   };
+
+
+  let waypoints = []; // 경유지 마커 배열
+
+  function addMapClickEvent() {
+
+    console.log("addMapClickEvent 실행됨");
+
+    kakao.maps.event.addListener(map, 'click', function(mouseEvent) {
+      const pos = mouseEvent.latLng;
+
+      const waypointMarker = new kakao.maps.Marker({
+        map: map,
+        position: pos
+      });
+
+      waypoints.push(waypointMarker);
+      console.log("경유지 추가:", pos.getLat(), pos.getLng());
+      showStatus(`경유지 ${waypoints.length}개 추가됨`);
+    });
+  }
+
 
   let map, ps, marker;
 
@@ -42,6 +64,8 @@ $(document).ready(function () {
           level: 3
         });
 
+        addMapClickEvent();
+
         marker = new kakao.maps.Marker({
           map: map,
           position: myPos
@@ -58,6 +82,8 @@ $(document).ready(function () {
           center: defaultPos,
           level: 5
         });
+        
+        addMapClickEvent();
 
         showStatus('위치 권한이 없어 기본 위치로 로드됩니다');
       },
@@ -66,6 +92,9 @@ $(document).ready(function () {
         timeout: 10000,
         maximumAge: 0
       }
+
+
+       
     );
   } else {
     // geolocation 미지원 브라우저 폴백
