@@ -132,7 +132,7 @@ $(document).ready(function () {
       waypoints = [];
 
       savedCourses.forEach(course => course.polyline.setMap(null));
-      savedCourses = [];
+      //savedCourses = [];
 
       $('#search-input').val('');
       updateCourseList();
@@ -203,7 +203,7 @@ $(document).ready(function () {
                       style="background-color:${course.color}" data-id="${course.id}">${course.name}</button>
               <button class="btn-delete-course" data-id="${course.id}">−</button>
               <div class="saved-course-details">
-               <span>${course.distance}km · ${course.duration}분 · ${course.waypoints.length}개 경유</span>
+               <span>${course.distance}km · ${course.waypoints.length}개 경유</span>
               </div>
              
             </div>
@@ -256,7 +256,7 @@ $(document).ready(function () {
       waypoints=[];
 
       savedCourses.forEach(c=>c.polyline.setMap(null));
-      savedCourses=[];
+      //savedCourses=[];
 
       $('#search-input').val('');
       updateCourseList();
@@ -283,8 +283,8 @@ $(document).ready(function () {
     // ─── 상태 메시지 ───────────────────────────────────────
     function showStatus(msg) {
       clearTimeout(statusTimer);
-      $('#status').text(msg).addClass('show');
-      statusTimer = setTimeout(()=>$('#status').removeClass('show'),2500);
+      $('#status').stop(true, true).text(msg).fadeIn(200);
+      statusTimer = setTimeout(() => $('#status').fadeOut(200), 2500);
     }
 
   });
