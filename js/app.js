@@ -4,200 +4,277 @@ $(document).ready(function () {
 
   const script = document.createElement('script');
   script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${KAKAO_JS_KEY}&libraries=services&autoload=false`;
-
   document.head.appendChild(script);
 
-  console.log("여기까지 옴");
-
-  script.onload = function() {
-    console.log("카카오 SDK 로드 완료");
+  script.onload = function () {
     if (kakao && kakao.maps) {
-        kakao.maps.load(function() {
-        console.log("kakao.maps.load 호출됨");
+      kakao.maps.load(function () {
         initMap();
       });
-    } else {
-      console.log(" kakao 객체 없음");
     }
   };
 
+  let map, ps, geocoder;
+  let startMarker = null;       // 출발지 마커
+  let startOverlay = null;      // 출발지 오버레이
+  let startPlace = null;        // 출발지 정보 { name, pos }
+  let waypoints = [];           // 경유지 배열 [{ marker, overlay, name, pos }]
 
-  // 경유지 정보 저장용 배열과 지오코더 변수
-  let waypoints = [];
-  let geocoder; // 추가
+  // ─── 지도 초기화 ───────────────────────────────────────────
+  function initMap() {
+    const container = document.getElementById('map');
+    ps = new kakao.maps.services.Places();
+    geocoder = new kakao.maps.services.Geocoder();
 
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        function (position) {
+          const myPos = new kakao.maps.LatLng(
+            position.coords.latitude,
+            position.coords.longitude
+          );
+          map = new kakao.maps.Map(container, { center: myPos, level: 3 });
+          addMapClickEvent();
+          showStatus('현재 위치로 지도를 로드했습니다');
+        },
+        function () {
+          const defaultPos = new kakao.maps.LatLng(37.5665, 126.9780);
+          map = new kakao.maps.Map(container, { center: defaultPos, level: 5 });
+          addMapClickEvent();
+          showStatus('기본 위치로 로드됩니다');
+        },
+        { enableHighAccuracy: false, timeout: 10000, maximumAge: 0 }
+      );
+    } else {
+      const defaultPos = new kakao.maps.LatLng(37.5665, 126.9780);
+      map = new kakao.maps.Map(container, { center: defaultPos, level: 5 });
+      addMapClickEvent();
+    }
+  }
+
+  // ─── 지도 클릭 → 경유지 추가 ───────────────────────────────
   function addMapClickEvent() {
-    geocoder = new kakao.maps.services.Geocoder(); // 추가
+    kakao.maps.event.addListener(map, 'click', function (mouseEvent) {
+      if (!startPlace) {
+        showStatus('먼저 출발지를 검색하세요');
+        return;
+      }
 
-    kakao.maps.event.addListener(map, 'click', function(mouseEvent) {
       const pos = mouseEvent.latLng;
 
-      // 좌표 → 주소 변환
-      geocoder.coord2Address(pos.getLng(), pos.getLat(), function(result, status) {
+      geocoder.coord2Address(pos.getLng(), pos.getLat(), function (result, status) {
         let placeName = '알 수 없는 위치';
 
         if (status === kakao.maps.services.Status.OK) {
           const addr = result[0];
-          // 도로명 있으면 도로명, 없으면 지번
-          placeName = addr.road_address
-            ? addr.road_address.building_name || addr.road_address.address_name
-            : addr.address.address_name;
+          if (addr.road_address && addr.road_address.building_name) {
+            placeName = addr.road_address.building_name;
+          } else if (addr.road_address) {
+            placeName = addr.road_address.address_name;
+          } else {
+            placeName = addr.address.address_name;
+          }
         }
 
-        // 마커 생성
-        const waypointMarker = new kakao.maps.Marker({
-          map: map,
-          position: pos
-        });
+        const waypointMarker = new kakao.maps.Marker({ map, position: pos });
 
-        // 말풍선 인포윈도우
         const overlay = new kakao.maps.CustomOverlay({
-            content: `<div style="padding:6px 10px;font-size:12px;font-weight:700;white-space:nowrap;background:white;border-radius:4px;border:1px solid #ccc;font-family:sans-serif;color:#111;">📍 ${placeName}</div>`,
-            position: pos,
-            yAnchor: 2.5
-          });
+          content: makeOverlayContent(placeName, 'waypoint'),
+          position: pos,
+          yAnchor: 2.5
+        });
         overlay.setMap(map);
 
-        waypoints.push({ marker: waypointMarker, overlay, name: placeName });
+        waypoints.push({ marker: waypointMarker, overlay, name: placeName, pos });
+        updateCourseList();
         showStatus(`경유지 ${waypoints.length}: ${placeName}`);
       });
     });
   }
 
-
-  // 초기화 함수
-  let map, ps, marker;
-
-  // 지도 초기화 및 현재 위치 표시
- function initMap() {
-  console.log("initMap 실행됨");
-
-  const container = document.getElementById('map');
-  ps = new kakao.maps.services.Places();
-
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(
-      function (position) {
-        const lat = position.coords.latitude;
-        const lng = position.coords.longitude;
-        const myPos = new kakao.maps.LatLng(lat, lng);
-
-        // 위치 확인 후 그 위치로 지도 생성
-        map = new kakao.maps.Map(container, {
-          center: myPos,
-          level: 3
-        });
-
-        addMapClickEvent();
-
-        marker = new kakao.maps.Marker({
-          map: map,
-          position: myPos
-        });
-
-        showStatus('현재 위치로 지도를 로드했습니다');
-      },
-      function (error) {
-        console.log("geolocation 에러:", error.code);
-
-        // 권한 거부 시 서울로 폴백
-        const defaultPos = new kakao.maps.LatLng(37.5665, 126.9780);
-        map = new kakao.maps.Map(container, {
-          center: defaultPos,
-          level: 5
-        });
-        
-        addMapClickEvent();
-
-        showStatus('위치 권한이 없어 기본 위치로 로드됩니다');
-      },
-      {
-        enableHighAccuracy: false,
-        timeout: 10000,
-        maximumAge: 0
-      }
-
-
-       
-    );
-  } else {
-    // geolocation 미지원 브라우저 폴백
-    const defaultPos = new kakao.maps.LatLng(37.5665, 126.9780);
-    map = new kakao.maps.Map(container, {
-      center: defaultPos,
-      level: 5
-    });
-  }
-}
-
-// 위치 이동 함수
-  function moveToLocation(pos, message) {
-    console.log("moveToLocation 호출됨", pos);
-
-    if (!map) {
-      console.log("map 없음");
-      return;
-    }
-
-    if (marker) marker.setMap(null);
-
-    marker = new kakao.maps.Marker({
-      map: map,
-      position: pos
-    });
-
-    map.setCenter(pos);
-    map.setLevel(3);
-
-    showStatus(message);
-  }
-
-
-// 검색 기능
+  // ─── 출발지 검색 ───────────────────────────────────────────
   $('#btn-search').on('click', doSearch);
   $('#search-input').on('keypress', e => { if (e.key === 'Enter') doSearch(); });
 
-  // 장소 검색 함수
   function doSearch() {
     const keyword = $('#search-input').val().trim();
     if (!keyword) return;
+    if (!map) { showStatus('지도가 아직 로드되지 않았습니다'); return; }
 
     ps.keywordSearch(keyword, (data, status) => {
       if (status === kakao.maps.services.Status.OK) {
         const place = data[0];
         const pos = new kakao.maps.LatLng(place.y, place.x);
 
-        if (marker) marker.setMap(null);
+        // 기존 출발지 마커/오버레이 제거
+        if (startMarker) startMarker.setMap(null);
+        if (startOverlay) startOverlay.setMap(null);
 
-        marker = new kakao.maps.Marker({ map, position: pos });
+        startMarker = new kakao.maps.Marker({ map, position: pos });
+
+        startOverlay = new kakao.maps.CustomOverlay({
+          content: makeOverlayContent(place.place_name, 'start'),
+          position: pos,
+          yAnchor: 2.5
+        });
+        startOverlay.setMap(map);
+
+        startPlace = { name: place.place_name, pos };
+
         map.setCenter(pos);
         map.setLevel(3);
 
-        const infoWindow = new kakao.maps.InfoWindow({
-          content: `<div style="padding:8px 12px;font-size:13px;font-weight:700;">${place.place_name}</div>`
-        });
-
-        infoWindow.open(map, marker);
-        showStatus(place.place_name);
+        updateCourseList();
+        showStatus(`출발지: ${place.place_name}`);
       } else {
         showStatus('검색 결과가 없습니다');
       }
     });
   }
 
-  // 현재 위치로 이동 버튼
+  // ─── 현재 위치 버튼 ────────────────────────────────────────
   $('#btn-locate').on('click', () => {
-    navigator.geolocation.getCurrentPosition(pos => {
-      const myPos = new kakao.maps.LatLng(
-        pos.coords.latitude,
-        pos.coords.longitude
-      );
-
-      moveToLocation(myPos, '현재 위치로 이동했습니다');
-    });
+    if (!map) return;
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        const myPos = new kakao.maps.LatLng(pos.coords.latitude, pos.coords.longitude);
+        map.setCenter(myPos);
+        map.setLevel(3);
+        showStatus('현재 위치로 이동했습니다');
+      },
+      () => showStatus('위치 권한을 허용해주세요')
+    );
   });
 
-  // 상태 메시지 표시 함수
+  // ─── 초기화 버튼 ───────────────────────────────────────────
+  $('#btn-reset').on('click', () => {
+    if (startMarker) startMarker.setMap(null);
+    if (startOverlay) startOverlay.setMap(null);
+    startMarker = null;
+    startOverlay = null;
+    startPlace = null;
+
+    waypoints.forEach(wp => {
+      wp.marker.setMap(null);
+      wp.overlay.setMap(null);
+    });
+    waypoints = [];
+
+    $('#search-input').val('');
+    updateCourseList();
+    showStatus('초기화되었습니다');
+  });
+
+ // ─── 저장된 코스 목록 ──────────────────────────────────────
+  let savedCourses = [];        // 저장된 코스 배열
+  let coursePolylines = [];     // 현재 지도에 표시된 폴리라인들
+
+  // ─── 코스 저장 버튼 ────────────────────────────────────────
+  $('#btn-save').on('click', () => {
+    if (!startPlace) { showStatus('출발지를 먼저 설정하세요'); return; }
+    if (waypoints.length === 0) { showStatus('경유지를 1개 이상 추가하세요'); return; }
+
+    // 순환 코스 좌표 수집: 출발지 → 경유지들 → 출발지
+    const positions = [
+      startPlace.pos,
+      ...waypoints.map(wp => wp.pos),
+      startPlace.pos   // 다시 출발지로
+    ];
+
+    // 폴리라인 그리기
+    const polyline = new kakao.maps.Polyline({
+      map: map,
+      path: positions,
+      strokeWeight: 4,
+      strokeColor: '#FEE500',
+      strokeOpacity: 0.9,
+      strokeStyle: 'solid'
+    });
+
+    // 코스 저장
+    const course = {
+      id: Date.now(),
+      name: `코스 ${savedCourses.length + 1}`,
+      start: startPlace.name,
+      waypoints: waypoints.map(wp => wp.name),
+      polyline,
+      visible: true
+    };
+
+    savedCourses.push(course);
+    updateSavedCoursePanel();
+    showStatus(`${course.name} 저장됨`);
+  });
+
+  // ─── 저장된 코스 패널 업데이트 ────────────────────────────
+  function updateSavedCoursePanel() {
+    const $panel = $('#saved-courses-panel');
+
+    if (savedCourses.length === 0) {
+      $panel.hide();
+      return;
+    }
+
+    $panel.show();
+    const $list = $('#saved-courses-list');
+    $list.empty();
+
+    savedCourses.forEach(course => {
+      $list.append(`
+        <li class="saved-course-item" data-id="${course.id}">
+          <div class="saved-course-info">
+            <span class="saved-course-name">${course.name}</span>
+            <span class="saved-course-detail">${course.start} 외 ${course.waypoints.length}개 경유</span>
+          </div>
+          <button class="btn-toggle-course ${course.visible ? 'on' : 'off'}" data-id="${course.id}">
+            ${course.visible ? '켜짐' : '꺼짐'}
+          </button>
+        </li>
+      `);
+    });
+  }
+
+  // ─── 코스 표시/숨김 토글 ──────────────────────────────────
+  $(document).on('click', '.btn-toggle-course', function () {
+    const id = parseInt($(this).data('id'));
+    const course = savedCourses.find(c => c.id === id);
+    if (!course) return;
+
+    course.visible = !course.visible;
+    course.polyline.setMap(course.visible ? map : null);
+    updateSavedCoursePanel();
+  });
+
+  // ─── 저장된 코스 패널 토글 버튼 ───────────────────────────
+  $('#btn-courses').on('click', () => {
+    $('#saved-courses-panel').slideToggle(200);
+  });
+  
+  // ─── 패널 코스 목록 업데이트 ───────────────────────────────
+  function updateCourseList() {
+    const $list = $('#course-list');
+    $list.empty();
+
+    if (!startPlace) {
+      $list.append('<li class="course-item empty">출발지를 검색하세요</li>');
+      return;
+    }
+
+    $list.append(`<li class="course-item start">${startPlace.name}</li>`);
+
+    waypoints.forEach((wp, i) => {
+      $list.append(`<li class="course-item waypoint">${wp.name}</li>`);
+    });
+  }
+
+  // ─── 오버레이 HTML 생성 ────────────────────────────────────
+  function makeOverlayContent(name, type) {
+    const bg = type === 'start' ? '#FEE500' : '#4a9eff';
+    const color = type === 'start' ? '#111' : '#fff';
+    return `<div style="padding:5px 10px;font-size:12px;font-weight:700;white-space:nowrap;background:${bg};border-radius:4px;font-family:sans-serif;color:${color};">${name}</div>`;
+  }
+
+  // ─── 상태 메시지 ───────────────────────────────────────────
   let statusTimer;
   function showStatus(msg) {
     clearTimeout(statusTimer);
