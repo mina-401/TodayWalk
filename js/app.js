@@ -151,8 +151,12 @@ $(document).ready(function () {
       const coords = points.map(p => `${p.getLng()},${p.getLat()}`).join(';');
 
       try {
-        const res = await fetch(`https://router.project-osrm.org/route/v1/foot/${coords}?overview=full&geometries=geojson`);
-        const data = await res.json();
+       const data = await $.ajax({
+          url: `https://router.project-osrm.org/route/v1/foot/${coords}`,
+          method: 'GET',
+          dataType: 'json',
+          data: { overview: 'full', geometries: 'geojson' }
+        });
         if (data.code !== 'Ok') return showStatus('경로를 불러오지 못했습니다');
 
         const routeCoords = data.routes[0].geometry.coordinates.map(([lng, lat]) => new kakao.maps.LatLng(lat, lng));
