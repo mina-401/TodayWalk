@@ -2,7 +2,7 @@
 
 카카오맵 기반의 나만의 산책 코스 생성 웹 앱입니다.
 
-[![Demo](https://img.shields.io/badge/🗺️_데모_보기-live-brightgreen)](https://mina-401.github.io/RunningCourse/)
+[![Demo](https://img.shields.io/badge/🗺️_데모_보기-live-brightgreen)](https://mina-401.github.io/TodayWalk/)
 <br>
 <img src="resources/readme_screenshot.png" width="400"/>
 
